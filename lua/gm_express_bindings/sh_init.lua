@@ -1,9 +1,14 @@
 AddCSLuaFile()
 
-local loaded = false
 ExpressBindings = {}
+ExpressBindings.Modules = {}
 ExpressBindings.waiting = {}
 
+if SERVER then
+    util.AddNetworkString( "express_bindings_change" )
+end
+
+local loaded = false
 function ExpressBindings.waitForExpress( name, cb )
     if loaded then
         ErrorNoHalt( "ExpressBindings.waitForExpress called after Express was loaded!" )
@@ -11,6 +16,43 @@ function ExpressBindings.waitForExpress( name, cb )
     end
 
     ExpressBindings.waiting[name] = cb
+end
+
+-- Creates a toggleable module. Handles changes and enable/disable callbacks
+function ExpressBindings.RegisterModule( name, module )
+    local cvarName = "express_bindings_enable_" .. name
+    local cvar = CreateConVar( cvarName, module.default and 1 or 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Express Bindings: Enable/Disable " .. name )
+    module.setting = cvar
+
+    if SERVER then
+        -- Server broadcasts changes to clients using net instead of cvar callbacks
+        -- due to a bug where cvar callbacks are not called on clients for replicated cvars
+        cvars.AddChangeCallback( cvarName, function( _, _, new )
+            new = tobool( new )
+
+            net.Start( "express_bindings_change" )
+                net.WriteString( name )
+                net.WriteBool( new )
+            net.Broadcast()
+
+            if not module:IsValid() then return end
+
+            if new then
+                module.Enable()
+            else
+                module.Disable()
+            end
+        end, "module_toggle" )
+    end
+
+    -- First load setting
+    ExpressBindings.waitForExpress( name, function()
+        if cvar:GetBool() and module:IsValid() then
+            module.Enable()
+        end
+    end )
+
+    ExpressBindings.Modules[name] = module
 end
 
 hook.Add( "ExpressLoaded", "ExpressBindings_Loader", function()
@@ -27,19 +69,16 @@ hook.Add( "ExpressLoaded", "ExpressBindings_Loader", function()
     end )
 end )
 
--- TODO: Make a proper loader
-if SERVER then
-    require( "playerload" )
-    include( "fpp/sv_init.lua" )
-    AddCSLuaFile( "fpp/cl_init.lua" )
+if CLIENT then
+    net.Receive( "express_bindings_change", function()
+        local moduleName = net.ReadString()
+        local enabled = net.ReadBool()
 
-    include( "adv2/sv_init.lua" )
-    AddCSLuaFile( "adv2/cl_init.lua" )
+        local module = ExpressBindings.Modules[moduleName]
+        if not module:IsValid() then return end
 
-    include( "p2m/sv_init.lua" )
-    AddCSLuaFile( "p2m/cl_init.lua" )
-else
-    include( "fpp/cl_init.lua" )
-    include( "adv2/cl_init.lua" )
-    include( "p2m/cl_init.lua" )
+        ProtectedCall( enabled and module.Enable or module.Disable )
+    end )
 end
+
+include( "sh_loader.lua" )

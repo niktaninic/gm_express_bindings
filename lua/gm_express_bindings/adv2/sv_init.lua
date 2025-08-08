@@ -5,6 +5,11 @@ return function( Module )
         Module.ogSendToClient = Module.ogSendToClient or AdvDupe2.SendToClient
         function AdvDupe2.SendToClient( ply, data, autoSave )
             if not IsValid( ply ) then return end
+            if #data > AdvDupe2.MaxDupeSize then
+                AdvDupe2.Notify( ply, "Copied duplicator filesize is too big!", NOTIFY_ERROR )
+                return
+            end
+
             ply.AdvDupe2.Downloading = true
             AdvDupe2.InitProgressBar( ply, "Saving:" )
 
@@ -15,7 +20,6 @@ return function( Module )
 
             express.Send( "advdupe2_receivefile", sendData, ply, function( cbPly )
                 cbPly.AdvDupe2.Downloading = false
-                AdvDupe2.RemoveProgressBar( ply )
             end )
         end
 

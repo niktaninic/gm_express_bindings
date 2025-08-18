@@ -1,7 +1,8 @@
 return function( Module )
     function Module.Enable()
         express.Receive( "advdupe2_receivefile", function( data )
-            AdvDupe2.ReceiveFile( data.data, data.autoSave )
+            local autoSave = data.autoSave == 1
+            AdvDupe2.ReceiveFile( data.data, autoSave )
         end )
 
         Module.originalSendFile = Module.originalSendFile or AdvDupe2.SendFile

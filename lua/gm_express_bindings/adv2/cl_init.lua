@@ -1,7 +1,8 @@
 return function( Module )
     function Module.Enable()
         express.Receive( "AdvDupe2.ReceiveFile", function( data )
-            local autoSave = data.autoSave == 1
+            -- KP: serwer wysyła true/false (wcześniej sprawdzane "== 1", więc autozapis nigdy nie działał)
+            local autoSave = data.autoSave == true or data.autoSave == 1
             AdvDupe2.ReceiveFile( data.data, autoSave )
         end )
 
@@ -12,10 +13,16 @@ return function( Module )
                 return
             end
 
+            -- jak w net.Stream: obiekt z Remove() (UploadFile woła go przy "wymuś ponownie")
+            AdvDupe2.Uploading = { Remove = function() end }
             express.Send( "AdvDupe2.SendFile", { name = name, data = data }, function()
-                AdvDupe2.Uploading = nil
                 AdvDupe2.File = nil
-                AdvDupe2.RemoveProgressBar()
+                if AdvDupe2.ClearFileUpload then
+                    AdvDupe2.ClearFileUpload()
+                else
+                    AdvDupe2.Uploading = nil
+                    AdvDupe2.RemoveProgressBar()
+                end
             end )
         end
     end

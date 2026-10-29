@@ -14,11 +14,13 @@ return function( Module )
         timer.Create( "express_p2m_send_download", 0.25, 0, function()
             for ply, downloads in pairs( pendingSendDownloads ) do
                 local downloadObjects = {}
+                local seen = {} -- KP: ten sam model (crc) z wielu encji tylko raz
 
-                for _, download in ipairs( downloads ) do
+                for _, download in ipairs( IsValid( ply ) and downloads or {} ) do
                     local ent, crc = download[1], download[2]
 
-                    if IsValid( ent ) then
+                    if IsValid( ent ) and not seen[crc] then
+                        seen[crc] = true
                         local partLists = ent.prop2mesh_partlists
 
                         if partLists then
